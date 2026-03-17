@@ -259,6 +259,10 @@
       </ol>
     </li>
     <li><a href="#拉取文件-例如拉取n8n项目">拉取文件, 例如拉取n8n项目</a></li>
+    <li><a href="#提交到分支并合并">提交到分支并合并</a></li>
+    <li><a href="#选择分支">选择分支</a></li>
+    <li><a href="#提交new_test分支">提交new_test分支</a></li>
+    <li><a href="#合并">合并</a></li>
     <li><a href="#至此项目已成功上传至-github-仓库">至此，项目已成功上传至 GitHub 仓库。</a></li>
     <li><a href="#如果你想使用http一般先生成一个token">如果你想使用http，一般先生成一个token</a></li>
   </ol>
@@ -333,7 +337,7 @@
 
 
                 <time class="article-time--reading">
-                    阅读时长: 1 分钟
+                    阅读时长: 2 分钟
                 </time>
             </div>
         
@@ -460,6 +464,68 @@
 </span></code></pre></td>
 <td class="lntd">
 <pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">git clone https://github.com/n8n-io/n8n.git
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h2 id="提交到分支并合并">提交到分支并合并
+</h2><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">git add .
+</span></span><span class="line"><span class="cl">git commit -m <span class="s2">&#34;初始化Vue+MQTT上位机前端项目&#34;</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="c1"># 查看所有分支</span>
+</span></span><span class="line"><span class="cl">git branch
+</span></span><span class="line"><span class="cl"><span class="c1"># 查看状态</span>
+</span></span><span class="line"><span class="cl">git status
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h2 id="选择分支">选择分支
+</h2><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">git checkout -b new_test
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h2 id="提交new_test分支">提交new_test分支
+</h2><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">git push -u origin new_test
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h2 id="合并">合并
+</h2><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="c1"># 切换到main分支</span>
+</span></span><span class="line"><span class="cl">git checkout main
+</span></span><span class="line"><span class="cl"><span class="c1"># 2. 拉取主分支最新内容（避免合并时冲突）</span>
+</span></span><span class="line"><span class="cl">git pull origin main
+</span></span><span class="line"><span class="cl"><span class="c1"># 合并new_test分支到main分支</span>
+</span></span><span class="line"><span class="cl">git merge new_test
 </span></span></code></pre></td></tr></table>
 </div>
 </div><h2 id="至此项目已成功上传至-github-仓库">至此，项目已成功上传至 GitHub 仓库。
