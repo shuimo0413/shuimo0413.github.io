@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="如何自定义docker网络">
-<title>自定义docker网络</title>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="本地构建镜像、导出 tar、上传服务器、load 后 compose 启动">
+<title>Docker Compose 前后端部署流程</title>
 
-<link rel='canonical' href='https://shuimo0413.github.io/p/docker-network/'>
+<link rel='canonical' href='https://shuimo0413.github.io/p/docker-compose-frontend-deploy/'>
 
-<link rel="stylesheet" href="/scss/style.min.fc6cf401155638ee2f3f606ec7573c5c7af0e4f362f11537a53a425d679cc3e9.css"><meta property='og:title' content="自定义docker网络">
-<meta property='og:description' content="如何自定义docker网络">
-<meta property='og:url' content='https://shuimo0413.github.io/p/docker-network/'>
+<link rel="stylesheet" href="/scss/style.min.fc6cf401155638ee2f3f606ec7573c5c7af0e4f362f11537a53a425d679cc3e9.css"><meta property='og:title' content="Docker Compose 前后端部署流程">
+<meta property='og:description' content="本地构建镜像、导出 tar、上传服务器、load 后 compose 启动">
+<meta property='og:url' content='https://shuimo0413.github.io/p/docker-compose-frontend-deploy/'>
 <meta property='og:site_name' content='shuimo0413'>
-<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:published_time' content='2026-03-15T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-03-15T00:00:00&#43;00:00'/>
-<meta name="twitter:title" content="自定义docker网络">
-<meta name="twitter:description" content="如何自定义docker网络">
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:published_time' content='2026-09-03T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-09-03T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="Docker Compose 前后端部署流程">
+<meta name="twitter:description" content="本地构建镜像、导出 tar、上传服务器、load 后 compose 启动">
     </head>
     <body class="
     article-page
@@ -228,29 +228,14 @@
         <div class="widget--toc">
             <nav id="TableOfContents">
   <ol>
-    <li><a href="#docker-镜像采用分层存储基于-unionfs-联合文件系统">Docker 镜像采用分层存储（基于 UnionFS 联合文件系统）：</a></li>
-  </ol>
-
-  <ol>
-    <li><a href="#这句话分为三个部分">这句话分为三个部分</a></li>
-    <li><a href="#然后我们创建容器">然后我们创建容器</a></li>
-    <li><a href="#此时观察容器状态">此时观察容器状态</a>
-      <ol>
-        <li>
-          <ol>
-            <li><a href="#容器已经跑起来了">容器已经跑起来了</a></li>
-          </ol>
-        </li>
-      </ol>
-    </li>
-  </ol>
-
-  <ol>
-    <li><a href="#查看自定义网络">查看自定义网络</a></li>
-    <li><a href="#创建自定义docker网络-1">创建自定义docker网络</a></li>
-    <li><a href="#让mysql容器加入自定义网络">让mysql容器加入自定义网络</a></li>
-    <li><a href="#创建容器的时候自己连接自定义网络">创建容器的时候自己连接自定义网络</a></li>
-    <li><a href="#连接配置成功的结果">连接配置成功的结果</a></li>
+    <li><a href="#本地构建">本地构建</a></li>
+    <li><a href="#导出成-tar">导出成 tar</a></li>
+    <li><a href="#上传到服务器">上传到服务器</a></li>
+    <li><a href="#服务器上还原镜像">服务器上还原镜像</a></li>
+    <li><a href="#指定配置文件">指定配置文件</a></li>
+    <li><a href="#启动容器">启动容器</a></li>
+    <li><a href="#验证">验证</a></li>
+    <li><a href="#小结">小结</a></li>
   </ol>
 </nav>
         </div>
@@ -277,17 +262,21 @@
                 运维
             </a>
         
+            <a href="/categories/%E9%83%A8%E7%BD%B2/" >
+                部署
+            </a>
+        
     </header>
     
 
     <div class="article-title-wrapper">
         <h2 class="article-title">
-            <a href="/p/docker-network/">自定义docker网络</a>
+            <a href="/p/docker-compose-frontend-deploy/">Docker Compose 前后端部署流程</a>
         </h2>
     
         
         <h3 class="article-subtitle">
-            如何自定义docker网络
+            本地构建镜像、导出 tar、上传服务器、load 后 compose 启动
         </h3>
         
     </div>
@@ -308,7 +297,7 @@
   <path d="M3 11h16" />
   <path d="M18 16.496v1.504l1 1" />
 </svg>
-                <time class="article-time--published" datetime='2026-03-15T00:00:00Z'>Mar 15, 2026</time>
+                <time class="article-time--published" datetime='2026-09-03T00:00:00Z'>Sep 03, 2026</time>
             </div>
         
 
@@ -338,169 +327,318 @@
     <section class="article-content">
     
     
-    <h1 id="自定义镜像">自定义镜像
-</h1><h1 id="dockerfile">Dockerfile
-</h1><h2 id="docker-镜像采用分层存储基于-unionfs-联合文件系统">Docker 镜像采用分层存储（基于 UnionFS 联合文件系统）：
-</h2><p>基础镜像（如ubuntu:20.04）是最底层的只读层；</p>
-<ul>
-<li>你每执行一个定制操作（如安装软件、复制文件），都会在原有层之上新增一个只读层；</li>
-<li>最终所有层叠加，形成完整的自定义镜像，容器启动时会在镜像层之上挂载一个可写层。</li>
-<li>这种分层机制的好处是：复用已有层（节省空间）、构建增量更新（只重新构建修改的层）。</li>
-</ul>
-<h1 id="示例制作预装-python3-的-ubuntu-自定义镜像">示例：制作预装 Python3 的 Ubuntu 自定义镜像
-</h1><div class="highlight"><div class="chroma">
+    <h1 id="docker-compose-前后端部署流程">Docker Compose 前后端部署流程
+</h1><p>这套流程不走镜像仓库，而是：<strong>本地用 docker compose 构建 → 把镜像打成 tar → scp 到服务器 → docker load → 再 compose up</strong>。适合内网或临时环境，不想搭 Registry 的时候用。</p>
+<p>整体顺序：</p>
+<ol>
+<li>本地构建 <code>frontend</code> / <code>backend</code> 镜像</li>
+<li><code>docker save</code> 导出 tar</li>
+<li><code>scp</code> 传到服务器 <code>/tmp</code></li>
+<li>服务器 <code>docker load</code> 还原镜像</li>
+<li>读入环境变量</li>
+<li><code>docker compose up</code> 只重建对应服务</li>
+<li><code>curl</code> 验证端口</li>
+</ol>
+<hr>
+<h2 id="本地构建">本地构建
+</h2><p>先进入项目的 <code>deploy</code> 目录，这里有 <code>docker-compose.yml</code>。</p>
+<div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
-<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
-</span><span class="lnt"> 2
-</span><span class="lnt"> 3
-</span><span class="lnt"> 4
-</span><span class="lnt"> 5
-</span><span class="lnt"> 6
-</span><span class="lnt"> 7
-</span><span class="lnt"> 8
-</span><span class="lnt"> 9
-</span><span class="lnt">10
-</span><span class="lnt">11
-</span><span class="lnt">12
-</span><span class="lnt">13
-</span><span class="lnt">14
-</span><span class="lnt">15
-</span><span class="lnt">16
-</span><span class="lnt">17
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
 </span></code></pre></td>
 <td class="lntd">
-<pre tabindex="0" class="chroma"><code class="language-dockerfile" data-lang="dockerfile"><span class="line"><span class="cl"><span class="c"># Dockerfile</span><span class="err">
-</span></span></span><span class="line"><span class="cl"><span class="c"># 1. 指定基础镜像（必选，第一层）</span><span class="err">
-</span></span></span><span class="line"><span class="cl"><span class="k">FROM</span><span class="w"> </span><span class="s">ubuntu:20.04</span><span class="err">
-</span></span></span><span class="line"><span class="cl"><span class="err">
-</span></span></span><span class="line"><span class="cl"><span class="c"># 2. 维护者信息（可选）</span><span class="err">
-</span></span></span><span class="line"><span class="cl"><span class="k">LABEL</span> <span class="nv">maintainer</span><span class="o">=</span><span class="s2">&#34;yourname &lt;your@email.com&gt;&#34;</span><span class="err">
-</span></span></span><span class="line"><span class="cl"><span class="err">
-</span></span></span><span class="line"><span class="cl"><span class="c"># 3. 执行命令（安装Python3，清理缓存减少镜像体积）</span><span class="err">
-</span></span></span><span class="line"><span class="cl"><span class="k">RUN</span> apt-get update <span class="o">&amp;&amp;</span> <span class="se">\
-</span></span></span><span class="line"><span class="cl">    apt-get install -y python3 python3-pip <span class="o">&amp;&amp;</span> <span class="se">\
-</span></span></span><span class="line"><span class="cl">    rm -rf /var/lib/apt/lists/*  <span class="c1"># 关键：清理缓存，避免层过大</span><span class="err">
-</span></span></span><span class="line"><span class="cl"><span class="err">
-</span></span></span><span class="line"><span class="cl"><span class="c"># 4. 设置工作目录（后续命令的默认目录）</span><span class="err">
-</span></span></span><span class="line"><span class="cl"><span class="k">WORKDIR</span><span class="w"> </span><span class="s">/app</span><span class="err">
-</span></span></span><span class="line"><span class="cl"><span class="err">
-</span></span></span><span class="line"><span class="cl"><span class="c"># 5. 容器启动默认命令</span><span class="err">
-</span></span></span><span class="line"><span class="cl"><span class="k">CMD</span> <span class="p">[</span><span class="s2">&#34;python3&#34;</span><span class="p">,</span> <span class="s2">&#34;--version&#34;</span><span class="p">]</span><span class="err">
-</span></span></span></code></pre></td></tr></table>
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="nb">cd</span> &lt;项目路径&gt;<span class="se">\d</span>eploy
+</span></span></code></pre></td></tr></table>
 </div>
-</div><h1 id="构建镜像">构建镜像
-</h1><div class="highlight"><div class="chroma">
+</div><p>构建用的就是这份 compose 文件，<code>-p deploy</code> 指定项目名，后面所有容器、网络都会挂在这个名字下面。</p>
+<div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt">1
 </span><span class="lnt">2
 </span></code></pre></td>
 <td class="lntd">
-<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="c1"># 假设 Dockerfile 所在目录为当前目录</span>
-</span></span><span class="line"><span class="cl">docker build -t docker-demo .
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">docker compose -p deploy build frontend
+</span></span><span class="line"><span class="cl">docker compose -p deploy build backend
 </span></span></code></pre></td></tr></table>
 </div>
-</div><h2 id="这句话分为三个部分">这句话分为三个部分
-</h2><ul>
-<li><code>docker build</code>：构建镜像命令；</li>
-<li><code>-t docker-demo</code>：指定镜像名称和标签；</li>
-<li><code>.</code>：当前目录，即 Dockerfile 所在目录。</li>
-</ul>
-<h2 id="然后我们创建容器">然后我们创建容器
-</h2><div class="highlight"><div class="chroma">
+</div><div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>参数</th>
+					<th>作用</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td><code>-p deploy</code></td>
+					<td>compose 项目名，镜像/容器名前缀都跟它走</td>
+			</tr>
+			<tr>
+					<td><code>build frontend</code></td>
+					<td>只构建 frontend 这个 service</td>
+			</tr>
+			<tr>
+					<td><code>build backend</code></td>
+					<td>只构建 backend 这个 service</td>
+			</tr>
+	</tbody>
+</table></div>
+<p>构建完成后看一眼镜像：</p>
+<div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt">1
 </span></code></pre></td>
 <td class="lntd">
-<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">docker build -t docker-demo .
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">docker images
 </span></span></code></pre></td></tr></table>
 </div>
-</div><h2 id="此时观察容器状态">此时观察容器状态
-</h2><h4 id="容器已经跑起来了">容器已经跑起来了
-</h4><div class="highlight"><div class="chroma">
+</div><p>一般会看到两个：</p>
+<ul>
+<li><code>finhire-backend:latest</code>：后端镜像（compose 里写死了 <code>image</code> 名）</li>
+<li><code>deploy-frontend:latest</code>：前端镜像（没写死 <code>image</code> 时，默认是 <strong>项目名-服务名</strong>，所以是 <code>deploy-frontend</code>）</li>
+</ul>
+<hr>
+<h2 id="导出成-tar">导出成 tar
+</h2><p>服务器上没有你本地的构建缓存，直接把镜像打包带走。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">docker save finhire-backend:latest -o .<span class="se">\a</span>rtifacts<span class="se">\f</span>inhire-backend.tar
+</span></span><span class="line"><span class="cl">docker save deploy-frontend:latest -o .<span class="se">\a</span>rtifacts<span class="se">\f</span>inhire-frontend.tar
+</span></span></code></pre></td></tr></table>
+</div>
+</div><div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>参数</th>
+					<th>作用</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td><code>docker save</code></td>
+					<td>把镜像打成 tar，包含所有层</td>
+			</tr>
+			<tr>
+					<td><code>-o</code></td>
+					<td>输出文件路径</td>
+			</tr>
+			<tr>
+					<td><code>.\artifacts\</code></td>
+					<td>本地产物目录，上传前确认目录存在</td>
+			</tr>
+	</tbody>
+</table></div>
+<p><code>save</code> 和 <code>export</code> 不一样：<code>save</code> 存的是<strong>镜像</strong>，load 回来还能再 <code>run</code> / <code>compose up</code>；<code>export</code> 存的是容器文件系统快照，不要用错。</p>
+<hr>
+<h2 id="上传到服务器">上传到服务器
+</h2><p>Windows PowerShell 里反引号 <code>`</code> 是换行。密钥和服务器地址按自己的环境改，不要把私钥和公网 IP 写进仓库。</p>
+<div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt">1
 </span><span class="lnt">2
 </span><span class="lnt">3
-</span><span class="lnt">4
-</span><span class="lnt">5
-</span><span class="lnt">6
 </span></code></pre></td>
 <td class="lntd">
-<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="o">[</span>root@localhost ~<span class="o">]</span><span class="c1"># docker ps -a</span>
-</span></span><span class="line"><span class="cl">CONTAINER ID   IMAGE         COMMAND                   CREATED              STATUS                    PORTS                                                  NAMES
-</span></span><span class="line"><span class="cl">e6ff2fceb771   docker-demo   <span class="s2">&#34;java -jar /app.jar&#34;</span>      About a minute ago   Up About a minute         0.0.0.0:8080-&gt;8080/tcp, :::8080-&gt;8080/tcp              dd
-</span></span><span class="line"><span class="cl">bfb1069106a2   mysql:8.0     <span class="s2">&#34;docker-entrypoint.s…&#34;</span>   <span class="m">17</span> hours ago         Up <span class="m">19</span> minutes             0.0.0.0:3306-&gt;3306/tcp, :::3306-&gt;3306/tcp, 33060/tcp   mysql
-</span></span><span class="line"><span class="cl">7bf0d447a7f9   nginx         <span class="s2">&#34;/docker-entrypoint.…&#34;</span>   <span class="m">21</span> hours ago         Exited <span class="o">(</span>0<span class="o">)</span> <span class="m">18</span> hours ago                                                          nginx
-</span></span><span class="line"><span class="cl"><span class="o">[</span>root@localhost ~<span class="o">]</span><span class="c1">#</span>
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">scp -i &lt;密钥路径&gt;.pem <span class="sb">`</span>
+</span></span><span class="line"><span class="cl">    <span class="s2">&#34;&lt;本地路径&gt;\deploy\artifacts\finhire-frontend.tar&#34;</span> <span class="sb">`</span>
+</span></span><span class="line"><span class="cl">    &lt;用户&gt;@&lt;服务器IP&gt;:/tmp/
 </span></span></code></pre></td></tr></table>
 </div>
-</div><h1 id="创建自定义docker网络">创建自定义docker网络
-</h1><ul>
-<li>docker自定义网络可以直接使用容器名相互访问，不需要知道ip</li>
-</ul>
-<h2 id="查看自定义网络">查看自定义网络
-</h2><div class="highlight"><div class="chroma">
+</div><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">scp -i &lt;密钥路径&gt;.pem <span class="sb">`</span>
+</span></span><span class="line"><span class="cl">    <span class="s2">&#34;&lt;本地路径&gt;\deploy\artifacts\finhire-backend.tar&#34;</span> <span class="sb">`</span>
+</span></span><span class="line"><span class="cl">    &lt;用户&gt;@&lt;服务器IP&gt;:/tmp/
+</span></span></code></pre></td></tr></table>
+</div>
+</div><div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>参数</th>
+					<th>作用</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td><code>-i</code></td>
+					<td>指定 SSH 私钥</td>
+			</tr>
+			<tr>
+					<td>最后一个参数</td>
+					<td><code>用户@主机:目标目录</code>，这里丢到 <code>/tmp/</code></td>
+			</tr>
+	</tbody>
+</table></div>
+<p>传完后 ssh 上去，确认文件在：</p>
+<div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt">1
 </span></code></pre></td>
 <td class="lntd">
-<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">docker network ls
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">ls -lh /tmp/finhire-frontend.tar /tmp/finhire-backend.tar
 </span></span></code></pre></td></tr></table>
 </div>
-</div><h2 id="创建自定义docker网络-1">创建自定义docker网络
+</div><hr>
+<h2 id="服务器上还原镜像">服务器上还原镜像
 </h2><div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt">1
 </span><span class="lnt">2
 </span></code></pre></td>
 <td class="lntd">
-<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="c1"># 创建自定义docker网络</span>
-</span></span><span class="line"><span class="cl">docker network create shuimo
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">sudo docker load -i /tmp/finhire-frontend.tar
+</span></span><span class="line"><span class="cl">sudo docker load -i /tmp/finhire-backend.tar
 </span></span></code></pre></td></tr></table>
 </div>
-</div><h2 id="让mysql容器加入自定义网络">让mysql容器加入自定义网络
+</div><p><code>load</code> 之后再用 <code>sudo docker images</code>，应该能看到刚才那两个 tag。名字必须和 compose 里要用的一致，否则 <code>up</code> 的时候会重新 pull / build。</p>
+<hr>
+<h2 id="指定配置文件">指定配置文件
+</h2><p>服务器上的 compose 目录和环境文件是分开的：代码在 app 目录，密钥和端口在 config 目录。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="nb">cd</span> /opt/finhire/app/deploy
+</span></span><span class="line"><span class="cl"><span class="nb">export</span> <span class="nv">ENV_FILE_PATH</span><span class="o">=</span>/opt/finhire/config/.env.staging
+</span></span><span class="line"><span class="cl"><span class="nb">set</span> -a <span class="o">&amp;&amp;</span> <span class="nb">source</span> <span class="s2">&#34;</span><span class="nv">$ENV_FILE_PATH</span><span class="s2">&#34;</span> <span class="o">&amp;&amp;</span> <span class="nb">set</span> +a
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这几句在干什么：</p>
+<ul>
+<li><code>ENV_FILE_PATH</code>：告诉后面的脚本 env 文件在哪。<code>FINHIRE_ENV_PROD</code> 之类是给其它部署脚本起的别名，这次手动 <code>compose up</code> 用不到。</li>
+<li><code>set -a</code>：接下来 <code>source</code> 进来的变量自动 <code>export</code>，子进程（也就是 docker compose）才能读到。</li>
+<li><code>source &quot;$ENV_FILE_PATH&quot;</code>：把 <code>MYSQL_*</code>、<code>FRONTEND_PORT</code> 等读进当前 shell。</li>
+<li><code>set +a</code>：关掉自动 export，避免后面随便定义的变量也被导出。</li>
+</ul>
+<p><code>sudo -E</code> 的 <code>-E</code> 很关键：sudo 默认会丢掉环境变量，不加 <code>-E</code>，刚才 source 进去的东西 compose 看不到。</p>
+<hr>
+<h2 id="启动容器">启动容器
+</h2><p>只重建某一个服务，不要把无关容器一起掀了。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">sudo -E docker compose -p deploy up -d --force-recreate --no-deps frontend
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>后端有改动再跑：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">sudo -E docker compose -p deploy up -d --force-recreate --no-deps backend
+</span></span></code></pre></td></tr></table>
+</div>
+</div><div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>参数</th>
+					<th>作用</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td><code>sudo -E</code></td>
+					<td>提权，同时保留当前环境变量</td>
+			</tr>
+			<tr>
+					<td><code>-p deploy</code></td>
+					<td>必须和构建时同一个项目名，否则会当成另一套栈</td>
+			</tr>
+			<tr>
+					<td><code>-d</code></td>
+					<td>后台跑</td>
+			</tr>
+			<tr>
+					<td><code>--force-recreate</code></td>
+					<td>即使配置没变也重建容器，保证用上刚 load 的镜像</td>
+			</tr>
+			<tr>
+					<td><code>--no-deps</code></td>
+					<td>不连带重启依赖服务（比如 mysql、redis）</td>
+			</tr>
+			<tr>
+					<td><code>frontend</code> / <code>backend</code></td>
+					<td>只操作这一个 service</td>
+			</tr>
+	</tbody>
+</table></div>
+<p><code>-p deploy</code> 一定要对上。本地 build 用的是 <code>deploy</code>，服务器 up 也必须是 <code>deploy</code>，镜像名 <code>deploy-frontend</code> 才对得上。</p>
+<hr>
+<h2 id="验证">验证
 </h2><div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt">1
 </span></code></pre></td>
 <td class="lntd">
-<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">docker network connect shuimo mysql
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">sudo docker ps
 </span></span></code></pre></td></tr></table>
 </div>
-</div><h2 id="创建容器的时候自己连接自定义网络">创建容器的时候自己连接自定义网络
-</h2><div class="highlight"><div class="chroma">
+</div><p>看 <code>frontend</code>、<code>backend</code> 是不是 <code>Up</code>，端口映射对不对。</p>
+<div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
 </span></code></pre></td>
 <td class="lntd">
-<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">docker run -d --name dd -p 8080:8080 --network shuimo docker-demo
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">curl -sS http://127.0.0.1:5150/health          <span class="c1"># 动过后端才需要</span>
+</span></span><span class="line"><span class="cl">curl -sS -o /dev/null -w <span class="s2">&#34;%{http_code}\n&#34;</span> http://127.0.0.1:3100/
 </span></span></code></pre></td></tr></table>
 </div>
-</div><h2 id="连接配置成功的结果">连接配置成功的结果
-</h2><p><img src="/p/docker-network/image-2.png"
-	width="696"
-	height="348"
-	srcset="/p/docker-network/image-2_hu_fac1167cd846321c.png 480w, /p/docker-network/image-2_hu_fa68275c94b84669.png 1024w"
-	loading="lazy"
-	
-	
-		class="gallery-image" 
-		data-flex-grow="200"
-		data-flex-basis="480px"
-	
-></p>
-<p>docker run -d <br>
-&ndash;name mysql <br>
-&ndash;network shuimo <br>
--p 3306:3306 \
--v /root/mysql/data:/var/lib/mysql <br>
--v /root/mysql/conf:/etc/mysql/conf.d \
--v /root/mysql/sql:/docker-entrypoint-initdb.d
--e MYSQL_ROOT_PASSWORD=1743355601 <br>
--e MYSQL_INITDB_SKIP_TZINFO=1 \
--e LANG=C.UTF-8 <br>
-&ndash;restart always \
-mysql:8.0</p>
+</div><div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>命令</th>
+					<th>期望</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>后端 <code>/health</code></td>
+					<td>返回健康检查内容</td>
+			</tr>
+			<tr>
+					<td>前端 <code>3100/</code></td>
+					<td>HTTP 状态码 <code>200</code></td>
+			</tr>
+	</tbody>
+</table></div>
+<p>前端 200 只说明 nginx/静态资源起来了。如果页面能开但接口全挂，再去看 backend 日志：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">sudo docker logs --tail <span class="m">100</span> deploy-backend-1
+</span></span><span class="line"><span class="cl">sudo docker logs --tail <span class="m">100</span> deploy-frontend-1
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>容器名以 <code>docker ps</code> 里实际名字为准。</p>
+<hr>
+<h2 id="小结">小结
+</h2><p>这套办法的核心就三步：<strong>本地 build 出带 tag 的镜像 → tar 搬到服务器 → load 完用同一份 compose 和同一份 env 拉起来</strong>。</p>
+<p>容易踩的点：</p>
+<ul>
+<li>镜像 tag 对不上（前端经常是 <code>deploy-frontend</code>，不是 <code>finhire-frontend</code>）</li>
+<li>服务器 <code>compose up</code> 忘了 <code>-p deploy</code></li>
+<li><code>sudo</code> 没加 <code>-E</code>，env 全丢</li>
+<li>用了 <code>--no-deps</code> 是故意的，mysql 没起来时不要指望 backend 自己把数据库拉起来</li>
+</ul>
 
 </section>
 
@@ -537,12 +675,25 @@ mysql:8.0</p>
             
                 
 <article class="">
-    <a href="/p/docker-compose-frontend-deploy/">
+    <a href="/p/docker-network/">
         
         
 
         <div class="article-details">
-            <h2 class="article-title">Docker Compose 前后端部署流程</h2>
+            <h2 class="article-title">自定义docker网络</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/p/oj_judge0_01/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">judge0的部署与使用</h2>
         </div>
     </a>
 </article>

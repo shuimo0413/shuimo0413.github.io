@@ -6,7 +6,7 @@
 
 <link rel='canonical' href='https://shuimo0413.github.io/p/mybatis-plus/'>
 
-<link rel="stylesheet" href="/scss/style.min.464fd1b4ec8bc9710556aa9c9dc7d3ce674b4ce26a42cb060a0d180d8a952c1f.css"><meta property='og:title' content="mybatis plus使用">
+<link rel="stylesheet" href="/scss/style.min.fc6cf401155638ee2f3f606ec7573c5c7af0e4f362f11537a53a425d679cc3e9.css"><meta property='og:title' content="mybatis plus使用">
 <meta property='og:description' content="mybatis plus 常见注解 @TableName\n作用：指定实体类对应的数据库表名 位置：实体类上 属性：value（指定表名） @TableId\n作用：指定实体类中主键字段对应的数据库表字段 位置：主键字段上 属性：value（指定表字段名），type（指定主键生成策略） @TableField\n作用：指定实体类中非主键字段对应的数据库表字段 位置：非主键字段上 属性：value（指定表字段名） #IdType\n作用：指定主键生成策略 位置：@TableId注解上 属性：value（指定主键生成策略） 类型 核心作用 AUTO 数据库自增（需表主键开启自增，插入时无需赋值） INPUT 手动输入（插入前必须给主键赋值，否则报错） ASSIGN_ID 默认策略，雪花算法生成全局唯一的 Long 型主键（无需赋值） ASSIGN_UUID 生成全局唯一的 UUID 字符串主键（需主键字段为 String 类型） NONE 无特定策略，跟随 MyBatis-Plus 全局主键配置 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 //假如tb_user是真正的表名，和类名不一样，那么需要对应一下呢 @TableName(&#34;tb_user&#34;) public class User { // 主键字段也对应一下,并指定主键生成策略为自增，一般主键就是自增的，加了这个之后，插入数据时，主键会自动增长 @TableId(value = &#34;id&#34;, type = IdType.AUTO) private Long id; @TableField(&#34;username&#34;) private String username; private String password; private String name; // 标记非表字段 @TableField(exist = false) private Integer address; } 总结 mybatis plus默认以类名驼峰转下划线作为表名 默认把名为id的字段作为主键 默认把变量名驼峰转下划线作为表的字段名 IService接口 条件查询 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 @Test void testQueryWrapper() { QueryWrapper&lt;User&gt; wrapper = new QueryWrapper&lt;User&gt;(); wrapper.select(&#34;id&#34;, &#34;username&#34;,&#34;info&#34;, &#34;balance&#34;) .like(&#34;username&#34;, &#34;o&#34;) .ge(&#34;balance&#34;, 1000); List&lt;User&gt; users = userMapper.selectList(wrapper); users.forEach(System.out::println); } // 或者你还可以这样写 @Test void testQueryWrapper() { QueryWrapper&lt;User&gt; wrapper = new QueryWrapper&lt;User&gt;() .select(&#34;id&#34;, &#34;username&#34;,&#34;info&#34;, &#34;balance&#34;) .like(&#34;username&#34;, &#34;o&#34;) .ge(&#34;balance&#34;, 1000); // 执行查询 List&lt;User&gt; users = userMapper.selectList(wrapper); users.forEach(System.out::println); } 更新数据 1 2 3 4 5 6 7 8 9 10 11 @Test void testUpdateWrapper() { User user = new User(); user.setBalance(114514); QueryWrapper&lt;User&gt; wrapper = new QueryWrapper&lt;User&gt;() .eq(&#34;username&#34;,&#34;jack&#34;); // user是你要更新的数据，wrapper是你要更新的条件 userMapper.update(user,wrapper); } 插入数据 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 @Test void testInsertWrapper() { User user = new User(); user.setUsername(&#34;shuimo&#34;); user.setPassword(&#34;1234565165&#34;); user.setBalance(114514); user.setPhone(&#34;18688990011&#34;); user.setInfo(&#34;{\\&#34;age\\&#34;: 24, \\&#34;intro\\&#34;: \\&#34;英文老师\\&#34;, \\&#34;gender\\&#34;: \\&#34;female\\&#34;}&#34;); user.setCreateTime(LocalDateTime.now()); user.setUpdateTime(LocalDateTime.now()); userMapper.insert(user); } 删除数据 1 2 3 4 5 6 @Test void testDeleteWrapper() { QueryWrapper&lt;User&gt; wrapper = new QueryWrapper&lt;User&gt;() .eq(&#34;username&#34;,&#34;shuimo&#34;); userMapper.delete(wrapper); } 批量修改 1 2 3 4 5 6 7 8 @Test void testAllUpdateWrapper() { List&lt;Long&gt; ids = List.of(1L, 2L, 3L); UpdateWrapper&lt;User&gt; wrapper = new UpdateWrapper&lt;User&gt;() .set(&#34;balance&#34;, 0) // 设置了balance为0 .in(&#34;id&#34;, ids); userMapper.update(null, wrapper); } 分页查询 1 2 3 4 5 6 7 8 9 10 11 @Test void testQueryByPage(){ // 分页查询 int start = 0; int size = 2; QueryWrapper&lt;User&gt; wrapper = new QueryWrapper&lt;User&gt;() .select(&#34;id&#34;, &#34;username&#34;,&#34;info&#34;, &#34;balance&#34;) .last(&#34;limit &#34; + start + &#34;,&#34; + size); userMapper.selectList(wrapper).forEach(System.out::println); } 自定义sql 查询两个表都有的数据 测试类 1 2 3 4 5 6 7 @Test void testQuery(){ // 复杂的查询，自定义sql,mq只支持单表 // 查询address和address1表都有的数据 List&lt;Address&gt; Address = addressMapper.query(); Address.forEach(System.out::println); } 实体类 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 @Data @TableName(&#34;address&#34;) public class Address { // 自增 @TableId(type = IdType.AUTO) private Long id; private String userId; private String province; private String city; private String towm; private String mobile; private String street; private String contact; private String isDefault; private String nodes; private String deleted; } mapper类 1 2 3 4 5 6 7 8 public interface AddressMapper extends BaseMapper&lt;Address&gt; { // 查询address和address1表都有的数据 @Select(&#34;select * from address inner join address1 on address.id = address1.id&#34;) List&lt;Address&gt; query(); } UserServiceImpl 类 1 2 3 4 5 // 通过继承复用了 ServiceImpl 中已经提前写好的方法 @Service public class UserServiceImpl extends ServiceImpl&lt;UserMapper, User&gt; implements IUserService { } IUserService 接口 1 2 3 public interface IUserService extends IService&lt;User&gt; { } UserMapper 接口 1 2 3 4 //继承BaseMapper，指定泛型为User public interface UserMapper extends BaseMapper&lt;User&gt; { } 分析原理： UserServiceImpl继承了ServiceImpl，并实现了IUserService接口,因此继承了ServiceImpl中的方法，并实现了IUserService中的方法 ServiceImpl.class 1 2 3 4 // ServiceImpl.class 是一个泛型类，继承了BaseMapper&lt;T&gt;，并实现了IService&lt;T&gt;接口 public class ServiceImpl&lt;M extends BaseMapper&lt;T&gt;, T&gt; implements IService&lt;T&gt; { } 实际上相当于 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 public class UserServiceImpl implements IUserService { @Autowired private UserMapper userMapper; // 实现save方法 @Override public boolean save(User user) { return userMapper.insert(user) &gt; 0; } // 实现getById方法 @Override public User getById(Long id) { return userMapper.selectById(id); } // 实现list方法 @Override public List&lt;User&gt; list() { return userMapper.selectList(null); } // 其他所有CRUD方法... } MybatisPlus不仅提供了BaseMapper，还提供了通用的Service接口及默认实现，封装了一些常用的service模板方法。 通用接口为IService，默认实现为ServiceImpl，其中封装的方法可以分为以下几类：\n">
 <meta property='og:url' content='https://shuimo0413.github.io/p/mybatis-plus/'>
 <meta property='og:site_name' content='shuimo0413'>
@@ -383,34 +383,34 @@
 </li>
 </ol>
 <div class="table-wrapper"><table>
-  <thead>
-      <tr>
-          <th>类型</th>
-          <th>核心作用</th>
-      </tr>
-  </thead>
-  <tbody>
-      <tr>
-          <td><code>AUTO</code></td>
-          <td>数据库自增（需表主键开启自增，插入时无需赋值）</td>
-      </tr>
-      <tr>
-          <td><code>INPUT</code></td>
-          <td>手动输入（插入前必须给主键赋值，否则报错）</td>
-      </tr>
-      <tr>
-          <td><code>ASSIGN_ID</code></td>
-          <td>默认策略，雪花算法生成全局唯一的 Long 型主键（无需赋值）</td>
-      </tr>
-      <tr>
-          <td><code>ASSIGN_UUID</code></td>
-          <td>生成全局唯一的 UUID 字符串主键（需主键字段为 String 类型）</td>
-      </tr>
-      <tr>
-          <td><code>NONE</code></td>
-          <td>无特定策略，跟随 MyBatis-Plus 全局主键配置</td>
-      </tr>
-  </tbody>
+	<thead>
+			<tr>
+					<th>类型</th>
+					<th>核心作用</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td><code>AUTO</code></td>
+					<td>数据库自增（需表主键开启自增，插入时无需赋值）</td>
+			</tr>
+			<tr>
+					<td><code>INPUT</code></td>
+					<td>手动输入（插入前必须给主键赋值，否则报错）</td>
+			</tr>
+			<tr>
+					<td><code>ASSIGN_ID</code></td>
+					<td>默认策略，雪花算法生成全局唯一的 Long 型主键（无需赋值）</td>
+			</tr>
+			<tr>
+					<td><code>ASSIGN_UUID</code></td>
+					<td>生成全局唯一的 UUID 字符串主键（需主键字段为 String 类型）</td>
+			</tr>
+			<tr>
+					<td><code>NONE</code></td>
+					<td>无特定策略，跟随 MyBatis-Plus 全局主键配置</td>
+			</tr>
+	</tbody>
 </table></div>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
@@ -1026,7 +1026,7 @@
         
         
             <div class="article-image">
-                <img src="/p/mybatis-plus%E5%B8%B8%E8%A7%81%E9%85%8D%E7%BD%AE/1007104420.1748b66dca9fa063e851183554f9701e_hu_11727b50532f03da.jpg" 
+                <img src="/p/mybatis-plus%E5%B8%B8%E8%A7%81%E9%85%8D%E7%BD%AE/1007104420.1748b66dca9fa063e851183554f9701e_hu_c7de074e8bd53d03.jpg" 
                         width="250" 
                         height="150" 
                         loading="lazy"
@@ -1089,7 +1089,7 @@
         
         
             <div class="article-image">
-                <img src="/p/java-upload-file/image.2e9b6e4a03f9212c7de18d10f9a77486_hu_4b322102520c32f2.png" 
+                <img src="/p/java-upload-file/image.2e9b6e4a03f9212c7de18d10f9a77486_hu_65b1dca06f5df84f.png" 
                         width="250" 
                         height="150" 
                         loading="lazy"
@@ -1133,8 +1133,9 @@
         (d.head || d.body).appendChild(s);
     })();
 </script>
-<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
 </div>
 
 <style>

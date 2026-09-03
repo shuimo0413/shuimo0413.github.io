@@ -7,7 +7,327 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>zh-cn</language>
         <copyright>shuimo</copyright>
-        <lastBuildDate>Sun, 15 Mar 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://shuimo0413.github.io/categories/docker/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Thu, 03 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://shuimo0413.github.io/categories/docker/index.xml" rel="self" type="application/rss+xml" /><item>
+        <title>Docker Compose 前后端部署流程</title>
+        <link>https://shuimo0413.github.io/p/docker-compose-frontend-deploy/</link>
+        <pubDate>Thu, 03 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://shuimo0413.github.io/p/docker-compose-frontend-deploy/</guid>
+        <description>&lt;h1 id=&#34;docker-compose-前后端部署流程&#34;&gt;Docker Compose 前后端部署流程
+&lt;/h1&gt;&lt;p&gt;这套流程不走镜像仓库，而是：&lt;strong&gt;本地用 docker compose 构建 → 把镜像打成 tar → scp 到服务器 → docker load → 再 compose up&lt;/strong&gt;。适合内网或临时环境，不想搭 Registry 的时候用。&lt;/p&gt;
+&lt;p&gt;整体顺序：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;本地构建 &lt;code&gt;frontend&lt;/code&gt; / &lt;code&gt;backend&lt;/code&gt; 镜像&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;docker save&lt;/code&gt; 导出 tar&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;scp&lt;/code&gt; 传到服务器 &lt;code&gt;/tmp&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;服务器 &lt;code&gt;docker load&lt;/code&gt; 还原镜像&lt;/li&gt;
+&lt;li&gt;读入环境变量&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;docker compose up&lt;/code&gt; 只重建对应服务&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;curl&lt;/code&gt; 验证端口&lt;/li&gt;
+&lt;/ol&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;本地构建&#34;&gt;本地构建
+&lt;/h2&gt;&lt;p&gt;先进入项目的 &lt;code&gt;deploy&lt;/code&gt; 目录，这里有 &lt;code&gt;docker-compose.yml&lt;/code&gt;。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;cd&lt;/span&gt; &amp;lt;项目路径&amp;gt;&lt;span class=&#34;se&#34;&gt;\d&lt;/span&gt;eploy
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;构建用的就是这份 compose 文件，&lt;code&gt;-p deploy&lt;/code&gt; 指定项目名，后面所有容器、网络都会挂在这个名字下面。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;docker compose -p deploy build frontend
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;docker compose -p deploy build backend
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;参数&lt;/th&gt;
+					&lt;th&gt;作用&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;code&gt;-p deploy&lt;/code&gt;&lt;/td&gt;
+					&lt;td&gt;compose 项目名，镜像/容器名前缀都跟它走&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;code&gt;build frontend&lt;/code&gt;&lt;/td&gt;
+					&lt;td&gt;只构建 frontend 这个 service&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;code&gt;build backend&lt;/code&gt;&lt;/td&gt;
+					&lt;td&gt;只构建 backend 这个 service&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;构建完成后看一眼镜像：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;docker images
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;一般会看到两个：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;finhire-backend:latest&lt;/code&gt;：后端镜像（compose 里写死了 &lt;code&gt;image&lt;/code&gt; 名）&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;deploy-frontend:latest&lt;/code&gt;：前端镜像（没写死 &lt;code&gt;image&lt;/code&gt; 时，默认是 &lt;strong&gt;项目名-服务名&lt;/strong&gt;，所以是 &lt;code&gt;deploy-frontend&lt;/code&gt;）&lt;/li&gt;
+&lt;/ul&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;导出成-tar&#34;&gt;导出成 tar
+&lt;/h2&gt;&lt;p&gt;服务器上没有你本地的构建缓存，直接把镜像打包带走。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;docker save finhire-backend:latest -o .&lt;span class=&#34;se&#34;&gt;\a&lt;/span&gt;rtifacts&lt;span class=&#34;se&#34;&gt;\f&lt;/span&gt;inhire-backend.tar
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;docker save deploy-frontend:latest -o .&lt;span class=&#34;se&#34;&gt;\a&lt;/span&gt;rtifacts&lt;span class=&#34;se&#34;&gt;\f&lt;/span&gt;inhire-frontend.tar
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;参数&lt;/th&gt;
+					&lt;th&gt;作用&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;code&gt;docker save&lt;/code&gt;&lt;/td&gt;
+					&lt;td&gt;把镜像打成 tar，包含所有层&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;code&gt;-o&lt;/code&gt;&lt;/td&gt;
+					&lt;td&gt;输出文件路径&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;code&gt;.\artifacts\&lt;/code&gt;&lt;/td&gt;
+					&lt;td&gt;本地产物目录，上传前确认目录存在&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;code&gt;save&lt;/code&gt; 和 &lt;code&gt;export&lt;/code&gt; 不一样：&lt;code&gt;save&lt;/code&gt; 存的是&lt;strong&gt;镜像&lt;/strong&gt;，load 回来还能再 &lt;code&gt;run&lt;/code&gt; / &lt;code&gt;compose up&lt;/code&gt;；&lt;code&gt;export&lt;/code&gt; 存的是容器文件系统快照，不要用错。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;上传到服务器&#34;&gt;上传到服务器
+&lt;/h2&gt;&lt;p&gt;Windows PowerShell 里反引号 &lt;code&gt;`&lt;/code&gt; 是换行。密钥和服务器地址按自己的环境改，不要把私钥和公网 IP 写进仓库。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;scp -i &amp;lt;密钥路径&amp;gt;.pem &lt;span class=&#34;sb&#34;&gt;`&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;s2&#34;&gt;&amp;#34;&amp;lt;本地路径&amp;gt;\deploy\artifacts\finhire-frontend.tar&amp;#34;&lt;/span&gt; &lt;span class=&#34;sb&#34;&gt;`&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &amp;lt;用户&amp;gt;@&amp;lt;服务器IP&amp;gt;:/tmp/
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;scp -i &amp;lt;密钥路径&amp;gt;.pem &lt;span class=&#34;sb&#34;&gt;`&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;s2&#34;&gt;&amp;#34;&amp;lt;本地路径&amp;gt;\deploy\artifacts\finhire-backend.tar&amp;#34;&lt;/span&gt; &lt;span class=&#34;sb&#34;&gt;`&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &amp;lt;用户&amp;gt;@&amp;lt;服务器IP&amp;gt;:/tmp/
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;参数&lt;/th&gt;
+					&lt;th&gt;作用&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;code&gt;-i&lt;/code&gt;&lt;/td&gt;
+					&lt;td&gt;指定 SSH 私钥&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;最后一个参数&lt;/td&gt;
+					&lt;td&gt;&lt;code&gt;用户@主机:目标目录&lt;/code&gt;，这里丢到 &lt;code&gt;/tmp/&lt;/code&gt;&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;传完后 ssh 上去，确认文件在：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;ls -lh /tmp/finhire-frontend.tar /tmp/finhire-backend.tar
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;hr&gt;
+&lt;h2 id=&#34;服务器上还原镜像&#34;&gt;服务器上还原镜像
+&lt;/h2&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;sudo docker load -i /tmp/finhire-frontend.tar
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;sudo docker load -i /tmp/finhire-backend.tar
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;load&lt;/code&gt; 之后再用 &lt;code&gt;sudo docker images&lt;/code&gt;，应该能看到刚才那两个 tag。名字必须和 compose 里要用的一致，否则 &lt;code&gt;up&lt;/code&gt; 的时候会重新 pull / build。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;指定配置文件&#34;&gt;指定配置文件
+&lt;/h2&gt;&lt;p&gt;服务器上的 compose 目录和环境文件是分开的：代码在 app 目录，密钥和端口在 config 目录。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;cd&lt;/span&gt; /opt/finhire/app/deploy
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;export&lt;/span&gt; &lt;span class=&#34;nv&#34;&gt;ENV_FILE_PATH&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;/opt/finhire/config/.env.staging
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;set&lt;/span&gt; -a &lt;span class=&#34;o&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span class=&#34;nb&#34;&gt;source&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;&lt;/span&gt;&lt;span class=&#34;nv&#34;&gt;$ENV_FILE_PATH&lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span class=&#34;nb&#34;&gt;set&lt;/span&gt; +a
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;这几句在干什么：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;ENV_FILE_PATH&lt;/code&gt;：告诉后面的脚本 env 文件在哪。&lt;code&gt;FINHIRE_ENV_PROD&lt;/code&gt; 之类是给其它部署脚本起的别名，这次手动 &lt;code&gt;compose up&lt;/code&gt; 用不到。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;set -a&lt;/code&gt;：接下来 &lt;code&gt;source&lt;/code&gt; 进来的变量自动 &lt;code&gt;export&lt;/code&gt;，子进程（也就是 docker compose）才能读到。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;source &amp;quot;$ENV_FILE_PATH&amp;quot;&lt;/code&gt;：把 &lt;code&gt;MYSQL_*&lt;/code&gt;、&lt;code&gt;FRONTEND_PORT&lt;/code&gt; 等读进当前 shell。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;set +a&lt;/code&gt;：关掉自动 export，避免后面随便定义的变量也被导出。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;code&gt;sudo -E&lt;/code&gt; 的 &lt;code&gt;-E&lt;/code&gt; 很关键：sudo 默认会丢掉环境变量，不加 &lt;code&gt;-E&lt;/code&gt;，刚才 source 进去的东西 compose 看不到。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;启动容器&#34;&gt;启动容器
+&lt;/h2&gt;&lt;p&gt;只重建某一个服务，不要把无关容器一起掀了。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;sudo -E docker compose -p deploy up -d --force-recreate --no-deps frontend
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;后端有改动再跑：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;sudo -E docker compose -p deploy up -d --force-recreate --no-deps backend
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;参数&lt;/th&gt;
+					&lt;th&gt;作用&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;code&gt;sudo -E&lt;/code&gt;&lt;/td&gt;
+					&lt;td&gt;提权，同时保留当前环境变量&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;code&gt;-p deploy&lt;/code&gt;&lt;/td&gt;
+					&lt;td&gt;必须和构建时同一个项目名，否则会当成另一套栈&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;code&gt;-d&lt;/code&gt;&lt;/td&gt;
+					&lt;td&gt;后台跑&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;code&gt;--force-recreate&lt;/code&gt;&lt;/td&gt;
+					&lt;td&gt;即使配置没变也重建容器，保证用上刚 load 的镜像&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;code&gt;--no-deps&lt;/code&gt;&lt;/td&gt;
+					&lt;td&gt;不连带重启依赖服务（比如 mysql、redis）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;code&gt;frontend&lt;/code&gt; / &lt;code&gt;backend&lt;/code&gt;&lt;/td&gt;
+					&lt;td&gt;只操作这一个 service&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;code&gt;-p deploy&lt;/code&gt; 一定要对上。本地 build 用的是 &lt;code&gt;deploy&lt;/code&gt;，服务器 up 也必须是 &lt;code&gt;deploy&lt;/code&gt;，镜像名 &lt;code&gt;deploy-frontend&lt;/code&gt; 才对得上。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;验证&#34;&gt;验证
+&lt;/h2&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;sudo docker ps
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;看 &lt;code&gt;frontend&lt;/code&gt;、&lt;code&gt;backend&lt;/code&gt; 是不是 &lt;code&gt;Up&lt;/code&gt;，端口映射对不对。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;curl -sS http://127.0.0.1:5150/health          &lt;span class=&#34;c1&#34;&gt;# 动过后端才需要&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;curl -sS -o /dev/null -w &lt;span class=&#34;s2&#34;&gt;&amp;#34;%{http_code}\n&amp;#34;&lt;/span&gt; http://127.0.0.1:3100/
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;命令&lt;/th&gt;
+					&lt;th&gt;期望&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;后端 &lt;code&gt;/health&lt;/code&gt;&lt;/td&gt;
+					&lt;td&gt;返回健康检查内容&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;前端 &lt;code&gt;3100/&lt;/code&gt;&lt;/td&gt;
+					&lt;td&gt;HTTP 状态码 &lt;code&gt;200&lt;/code&gt;&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;前端 200 只说明 nginx/静态资源起来了。如果页面能开但接口全挂，再去看 backend 日志：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;sudo docker logs --tail &lt;span class=&#34;m&#34;&gt;100&lt;/span&gt; deploy-backend-1
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;sudo docker logs --tail &lt;span class=&#34;m&#34;&gt;100&lt;/span&gt; deploy-frontend-1
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;容器名以 &lt;code&gt;docker ps&lt;/code&gt; 里实际名字为准。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;小结&#34;&gt;小结
+&lt;/h2&gt;&lt;p&gt;这套办法的核心就三步：&lt;strong&gt;本地 build 出带 tag 的镜像 → tar 搬到服务器 → load 完用同一份 compose 和同一份 env 拉起来&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;容易踩的点：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;镜像 tag 对不上（前端经常是 &lt;code&gt;deploy-frontend&lt;/code&gt;，不是 &lt;code&gt;finhire-frontend&lt;/code&gt;）&lt;/li&gt;
+&lt;li&gt;服务器 &lt;code&gt;compose up&lt;/code&gt; 忘了 &lt;code&gt;-p deploy&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;sudo&lt;/code&gt; 没加 &lt;code&gt;-E&lt;/code&gt;，env 全丢&lt;/li&gt;
+&lt;li&gt;用了 &lt;code&gt;--no-deps&lt;/code&gt; 是故意的，mysql 没起来时不要指望 backend 自己把数据库拉起来&lt;/li&gt;
+&lt;/ul&gt;
+</description>
+        </item>
+        <item>
         <title>自定义docker网络</title>
         <link>https://shuimo0413.github.io/p/docker-network/</link>
         <pubDate>Sun, 15 Mar 2026 00:00:00 +0000</pubDate>
@@ -432,34 +752,34 @@ mysql:8.0&lt;/p&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;h4 id=&#34;2参数说明&#34;&gt;（2）参数说明
 &lt;/h4&gt;&lt;table&gt;
-  &lt;thead&gt;
-      &lt;tr&gt;
-          &lt;th&gt;参数&lt;/th&gt;
-          &lt;th&gt;含义&lt;/th&gt;
-      &lt;/tr&gt;
-  &lt;/thead&gt;
-  &lt;tbody&gt;
-      &lt;tr&gt;
-          &lt;td&gt;&lt;code&gt;--name mysqlserver&lt;/code&gt;&lt;/td&gt;
-          &lt;td&gt;容器名称（自定义，如 mysqlserver）&lt;/td&gt;
-      &lt;/tr&gt;
-      &lt;tr&gt;
-          &lt;td&gt;&lt;code&gt;-p 3306:3306&lt;/code&gt;&lt;/td&gt;
-          &lt;td&gt;端口映射：主机 3306 端口 → 容器 3306 端口&lt;/td&gt;
-      &lt;/tr&gt;
-      &lt;tr&gt;
-          &lt;td&gt;&lt;code&gt;-v 主机路径:容器路径&lt;/code&gt;&lt;/td&gt;
-          &lt;td&gt;目录挂载（实现主机与容器文件同步，无需进入容器修改配置）&lt;/td&gt;
-      &lt;/tr&gt;
-      &lt;tr&gt;
-          &lt;td&gt;&lt;code&gt;$PWD&lt;/code&gt;&lt;/td&gt;
-          &lt;td&gt;当前命令执行目录（建议先 cd 到自定义目录，如 &lt;code&gt;/gxp/dockersoft/mysql&lt;/code&gt;）&lt;/td&gt;
-      &lt;/tr&gt;
-      &lt;tr&gt;
-          &lt;td&gt;&lt;code&gt;-e MYSQL_ROOT_PASSWORD=root&lt;/code&gt;&lt;/td&gt;
-          &lt;td&gt;设置 MySQL root 用户密码（自定义，如 root）&lt;/td&gt;
-      &lt;/tr&gt;
-  &lt;/tbody&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;参数&lt;/th&gt;
+					&lt;th&gt;含义&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;code&gt;--name mysqlserver&lt;/code&gt;&lt;/td&gt;
+					&lt;td&gt;容器名称（自定义，如 mysqlserver）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;code&gt;-p 3306:3306&lt;/code&gt;&lt;/td&gt;
+					&lt;td&gt;端口映射：主机 3306 端口 → 容器 3306 端口&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;code&gt;-v 主机路径:容器路径&lt;/code&gt;&lt;/td&gt;
+					&lt;td&gt;目录挂载（实现主机与容器文件同步，无需进入容器修改配置）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;code&gt;$PWD&lt;/code&gt;&lt;/td&gt;
+					&lt;td&gt;当前命令执行目录（建议先 cd 到自定义目录，如 &lt;code&gt;/gxp/dockersoft/mysql&lt;/code&gt;）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;code&gt;-e MYSQL_ROOT_PASSWORD=root&lt;/code&gt;&lt;/td&gt;
+					&lt;td&gt;设置 MySQL root 用户密码（自定义，如 root）&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
 &lt;/table&gt;
 &lt;h4 id=&#34;3推荐目录结构示例&#34;&gt;（3）推荐目录结构（示例）
 &lt;/h4&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
@@ -520,46 +840,46 @@ mysql:8.0&lt;/p&gt;
 &lt;/ul&gt;
 &lt;h2 id=&#34;五docker-常用命令&#34;&gt;五、Docker 常用命令
 &lt;/h2&gt;&lt;table&gt;
-  &lt;thead&gt;
-      &lt;tr&gt;
-          &lt;th&gt;功能&lt;/th&gt;
-          &lt;th&gt;命令&lt;/th&gt;
-      &lt;/tr&gt;
-  &lt;/thead&gt;
-  &lt;tbody&gt;
-      &lt;tr&gt;
-          &lt;td&gt;拉取镜像&lt;/td&gt;
-          &lt;td&gt;&lt;code&gt;docker pull 镜像名称&lt;/code&gt;（如 mysql）&lt;/td&gt;
-      &lt;/tr&gt;
-      &lt;tr&gt;
-          &lt;td&gt;查看所有已拉取镜像&lt;/td&gt;
-          &lt;td&gt;&lt;code&gt;docker images&lt;/code&gt;&lt;/td&gt;
-      &lt;/tr&gt;
-      &lt;tr&gt;
-          &lt;td&gt;查看所有容器（运行+停止）&lt;/td&gt;
-          &lt;td&gt;&lt;code&gt;docker ps -a&lt;/code&gt;&lt;/td&gt;
-      &lt;/tr&gt;
-      &lt;tr&gt;
-          &lt;td&gt;启动容器&lt;/td&gt;
-          &lt;td&gt;&lt;code&gt;docker start 容器名称/ID&lt;/code&gt;&lt;/td&gt;
-      &lt;/tr&gt;
-      &lt;tr&gt;
-          &lt;td&gt;停止容器&lt;/td&gt;
-          &lt;td&gt;&lt;code&gt;docker stop 容器名称/ID&lt;/code&gt;&lt;/td&gt;
-      &lt;/tr&gt;
-      &lt;tr&gt;
-          &lt;td&gt;删除容器&lt;/td&gt;
-          &lt;td&gt;&lt;code&gt;docker rm 容器名称/ID&lt;/code&gt;&lt;/td&gt;
-      &lt;/tr&gt;
-      &lt;tr&gt;
-          &lt;td&gt;查看容器日志&lt;/td&gt;
-          &lt;td&gt;&lt;code&gt;docker logs 容器名称/ID&lt;/code&gt;&lt;/td&gt;
-      &lt;/tr&gt;
-      &lt;tr&gt;
-          &lt;td&gt;进入容器内部&lt;/td&gt;
-          &lt;td&gt;&lt;code&gt;docker exec -it 容器名称/ID /bin/bash&lt;/code&gt;&lt;/td&gt;
-      &lt;/tr&gt;
-  &lt;/tbody&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;功能&lt;/th&gt;
+					&lt;th&gt;命令&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;拉取镜像&lt;/td&gt;
+					&lt;td&gt;&lt;code&gt;docker pull 镜像名称&lt;/code&gt;（如 mysql）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;查看所有已拉取镜像&lt;/td&gt;
+					&lt;td&gt;&lt;code&gt;docker images&lt;/code&gt;&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;查看所有容器（运行+停止）&lt;/td&gt;
+					&lt;td&gt;&lt;code&gt;docker ps -a&lt;/code&gt;&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;启动容器&lt;/td&gt;
+					&lt;td&gt;&lt;code&gt;docker start 容器名称/ID&lt;/code&gt;&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;停止容器&lt;/td&gt;
+					&lt;td&gt;&lt;code&gt;docker stop 容器名称/ID&lt;/code&gt;&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;删除容器&lt;/td&gt;
+					&lt;td&gt;&lt;code&gt;docker rm 容器名称/ID&lt;/code&gt;&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;查看容器日志&lt;/td&gt;
+					&lt;td&gt;&lt;code&gt;docker logs 容器名称/ID&lt;/code&gt;&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;进入容器内部&lt;/td&gt;
+					&lt;td&gt;&lt;code&gt;docker exec -it 容器名称/ID /bin/bash&lt;/code&gt;&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
 &lt;/table&gt;
 </description>
         </item>
@@ -572,74 +892,74 @@ mysql:8.0&lt;/p&gt;
         <description>&lt;h1 id=&#34;docker基本命令&#34;&gt;docker基本命令
 &lt;/h1&gt;&lt;h1 id=&#34;常用命令&#34;&gt;常用命令
 &lt;/h1&gt;&lt;table&gt;
-  &lt;thead&gt;
-      &lt;tr&gt;
-          &lt;th&gt;命令&lt;/th&gt;
-          &lt;th&gt;功能&lt;/th&gt;
-      &lt;/tr&gt;
-  &lt;/thead&gt;
-  &lt;tbody&gt;
-      &lt;tr&gt;
-          &lt;td&gt;docker pull&lt;/td&gt;
-          &lt;td&gt;拉取镜像&lt;/td&gt;
-      &lt;/tr&gt;
-      &lt;tr&gt;
-          &lt;td&gt;docker push&lt;/td&gt;
-          &lt;td&gt;推送镜像&lt;/td&gt;
-      &lt;/tr&gt;
-      &lt;tr&gt;
-          &lt;td&gt;docker images&lt;/td&gt;
-          &lt;td&gt;查看本地镜像&lt;/td&gt;
-      &lt;/tr&gt;
-      &lt;tr&gt;
-          &lt;td&gt;docker rmi&lt;/td&gt;
-          &lt;td&gt;删除本地镜像&lt;/td&gt;
-      &lt;/tr&gt;
-      &lt;tr&gt;
-          &lt;td&gt;docker run&lt;/td&gt;
-          &lt;td&gt;创建并运行容器（不能重复创建）&lt;/td&gt;
-      &lt;/tr&gt;
-      &lt;tr&gt;
-          &lt;td&gt;docker stop&lt;/td&gt;
-          &lt;td&gt;停止指定容器&lt;/td&gt;
-      &lt;/tr&gt;
-      &lt;tr&gt;
-          &lt;td&gt;docker start&lt;/td&gt;
-          &lt;td&gt;启动指定容器&lt;/td&gt;
-      &lt;/tr&gt;
-      &lt;tr&gt;
-          &lt;td&gt;docker restart&lt;/td&gt;
-          &lt;td&gt;重新启动容器&lt;/td&gt;
-      &lt;/tr&gt;
-      &lt;tr&gt;
-          &lt;td&gt;docker rm&lt;/td&gt;
-          &lt;td&gt;删除指定容器&lt;/td&gt;
-      &lt;/tr&gt;
-      &lt;tr&gt;
-          &lt;td&gt;docker ps&lt;/td&gt;
-          &lt;td&gt;查看容器&lt;/td&gt;
-      &lt;/tr&gt;
-      &lt;tr&gt;
-          &lt;td&gt;docker logs&lt;/td&gt;
-          &lt;td&gt;查看容器运行日志&lt;/td&gt;
-      &lt;/tr&gt;
-      &lt;tr&gt;
-          &lt;td&gt;docker exec&lt;/td&gt;
-          &lt;td&gt;进入容器&lt;/td&gt;
-      &lt;/tr&gt;
-      &lt;tr&gt;
-          &lt;td&gt;docker save&lt;/td&gt;
-          &lt;td&gt;保存镜像到本地压缩文件&lt;/td&gt;
-      &lt;/tr&gt;
-      &lt;tr&gt;
-          &lt;td&gt;docker load&lt;/td&gt;
-          &lt;td&gt;加载本地压缩文件到镜像&lt;/td&gt;
-      &lt;/tr&gt;
-      &lt;tr&gt;
-          &lt;td&gt;docker inspect&lt;/td&gt;
-          &lt;td&gt;查看容器详细信息&lt;/td&gt;
-      &lt;/tr&gt;
-  &lt;/tbody&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;命令&lt;/th&gt;
+					&lt;th&gt;功能&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;docker pull&lt;/td&gt;
+					&lt;td&gt;拉取镜像&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;docker push&lt;/td&gt;
+					&lt;td&gt;推送镜像&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;docker images&lt;/td&gt;
+					&lt;td&gt;查看本地镜像&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;docker rmi&lt;/td&gt;
+					&lt;td&gt;删除本地镜像&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;docker run&lt;/td&gt;
+					&lt;td&gt;创建并运行容器（不能重复创建）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;docker stop&lt;/td&gt;
+					&lt;td&gt;停止指定容器&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;docker start&lt;/td&gt;
+					&lt;td&gt;启动指定容器&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;docker restart&lt;/td&gt;
+					&lt;td&gt;重新启动容器&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;docker rm&lt;/td&gt;
+					&lt;td&gt;删除指定容器&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;docker ps&lt;/td&gt;
+					&lt;td&gt;查看容器&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;docker logs&lt;/td&gt;
+					&lt;td&gt;查看容器运行日志&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;docker exec&lt;/td&gt;
+					&lt;td&gt;进入容器&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;docker save&lt;/td&gt;
+					&lt;td&gt;保存镜像到本地压缩文件&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;docker load&lt;/td&gt;
+					&lt;td&gt;加载本地压缩文件到镜像&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;docker inspect&lt;/td&gt;
+					&lt;td&gt;查看容器详细信息&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
 &lt;/table&gt;
 &lt;h1 id=&#34;启动容器&#34;&gt;启动容器
 &lt;/h1&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
